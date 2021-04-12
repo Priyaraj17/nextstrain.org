@@ -56,7 +56,7 @@ const requestV1Dataset = async (metaJsonUrl, treeJsonUrl) => {
  * then the promise will reject.
  */
 const requestMainDataset = async (res, dataset) => {
-  const main = dataset.urlFor("main");
+  const main = await dataset.urlFor("main");
 
   return new Promise((resolve, reject) => {
     /* try to stream the (v2+) dataset JSON as the response */
@@ -71,8 +71,8 @@ const requestMainDataset = async (res, dataset) => {
         }
         utils.verbose(`The request for ${main} returned ${response.statusCode}.`);
 
-        const meta = dataset.urlFor("meta");
-        const tree = dataset.urlFor("tree");
+        const meta = await dataset.urlFor("meta");
+        const tree = await dataset.urlFor("tree");
         const [success, dataToReturn] = await requestV1Dataset(meta, tree);
         if (success) {
           res.send(dataToReturn);
@@ -121,7 +121,7 @@ const getDataset = async (req, res) => {
   // construct fetch URL
   let datasetInfo;
   try {
-    datasetInfo = helpers.parsePrefix(query.prefix, query);
+    datasetInfo = await helpers.parsePrefix(query.prefix, query);
     utils.verbose("Dataset: ", datasetInfo);
   } catch (err) {
     /* Return a 204 No Content when Auspice makes a dataset request to a
@@ -147,7 +147,7 @@ const getDataset = async (req, res) => {
   /* If we got a partial prefix and resolved it into a full one, redirect to
    * that.  Auspice will notice and update its displayed URL appropriately.
    */
-  if (resolvedPrefix !== helpers.canonicalizePrefix(query.prefix)) {
+  if (resolvedPrefix !== await helpers.canonicalizePrefix(query.prefix)) {
     // A absolute base is required but we won't use it, so use something bogus.
     const resolvedUrl = new URL(req.originalUrl, "http://x");
     resolvedUrl.searchParams.set("prefix", resolvedPrefix);
@@ -160,7 +160,7 @@ const getDataset = async (req, res) => {
   }
 
   if (query.type) {
-    const url = dataset.urlFor(query.type);
+    const url = await dataset.urlFor(query.type);
     try {
       await requestCertainFileType(res, req, url, query);
     } catch (err) {

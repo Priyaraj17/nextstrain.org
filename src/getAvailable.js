@@ -15,37 +15,38 @@ const getAvailable = async (req, res) => {
     return unauthorized(req, res);
   }
 
-  let datasets;
-  let narratives;
+  let datasetPaths;
+  let narrativePaths;
 
   try {
-    datasets = await source.availableDatasets() || [];
-    narratives = await source.availableNarratives() || [];
+    datasetPaths = await source.availableDatasets() || [];
+    narrativePaths = await source.availableNarratives() || [];
   } catch (err) {
     if (err instanceof ResourceNotFoundError) {
       return res.status(404).send("The requested URL does not exist.");
     }
   }
 
-  if (!datasets || !datasets.length) {
+  if (!datasetPaths || !datasetPaths.length) {
     utils.verbose(`No datasets available for ${source.name}`);
   }
-  if (!narratives || !narratives.length) {
+  if (!narrativePaths || !narrativePaths.length) {
     utils.verbose(`No narratives available for ${source.name}`);
   }
 
-  return res.json({
-    datasets: datasets.map((path) => ({
-      request: joinPartsIntoPrefix({source, prefixParts: [path]}),
-      secondTreeOptions: source.secondTreeOptions(path),
-      buildUrl: source.name === "community"
-        ? `https://github.com/${source.repo}`
-        : null
-    })),
-    narratives: narratives.map((path) => ({
-      request: joinPartsIntoPrefix({source, prefixParts: [path], isNarrative: true})
-    }))
-  });
+  const datasets = [];
+  const narratives = [];
+  for (let i=0; i<datasetPaths.length; i++) {
+    const request = await joinPartsIntoPrefix({source, prefixParts: [datasetPaths[i]]}); // eslint-disable-line no-await-in-loop
+    const secondTreeOptions = source.secondTreeOptions(datasetPaths[i]);
+    const buildUrl = source.name === "community" ? `https://github.com/${source.repo}` : null;
+    datasets.push({request, secondTreeOptions, buildUrl});
+  }
+  for (let i=0; i<narrativePaths.length; i++) {
+    const request = await joinPartsIntoPrefix({source, prefixParts: [narrativePaths[i]], isNarrative: true}); // eslint-disable-line no-await-in-loop
+    narratives.push({request});
+  }
+  return res.json({datasets, narratives});
 };
 
 module.exports = {
