@@ -8,6 +8,7 @@ import {
 import * as splashStyles from "../components/splash/styles";
 import DatasetSelect from "../components/Datasets/dataset-select";
 import GenericPage from "../layouts/generic-page";
+import { fetchAndParseJSON } from "../util/datasetsHelpers";
 
 function Title({avatarSrc, children}) {
   if (!children) return null;
@@ -86,13 +87,22 @@ class Index extends React.Component {
       sourceInfo: undefined
     };
   }
+
+  // parse getAvailable listing into one that dataset-select component accepts
+  createDatasetListing = (list, groupName) => {
+    return list.map((d) => {
+      return {
+        filename: d.request.replace(`groups/${groupName}/`, '').replace('narratives/', ''),
+        url: `https://nextstrain.org/${d.request}`,
+        contributor: groupName
+      };
+    });
+  };
+
   async componentDidMount() {
     const groupName = this.props["groupName"];
-    const getSourceInfoUrl = `/charon/getSourceInfo?prefix=/groups/${groupName}/`;
-    fetch(getSourceInfoUrl)
-      .then((res) => res.text())
-      .then((text) => {
-        const sourceInfo = JSON.parse(text);
+    fetchAndParseJSON(`/charon/getSourceInfo?prefix=/groups/${groupName}/`)
+      .then((sourceInfo) => {
         this.setState({sourceInfo});
         return sourceInfo;
       })
@@ -102,13 +112,17 @@ class Index extends React.Component {
       })
       .then((sourceInfo) => {
         if (sourceInfo.showDatasets || sourceInfo.showNarratives) {
-          const getAvailableUrl = `/charon/getAvailable?prefix=/groups/${groupName}/`;
-          return fetchAndParseJSON(getAvailableUrl, groupName);
+          return fetchAndParseJSON(`/charon/getAvailable?prefix=/groups/${groupName}/`);
         }
         return undefined;
       })
-      .then(({datasets, narratives}) => {
-        this.setState({datasets, narratives, dataLoaded: true, groupName});
+      .then((availableDataJson) => {
+        this.setState({
+          datasets: this.createDatasetListing(availableDataJson.datasets, groupName),
+          narratives: this.createDatasetListing(availableDataJson.narratives, groupName),
+          dataLoaded: true,
+          groupName
+        });
       })
       .catch((err) => {
         console.error("Error fetching / parsing data.", err.message);
@@ -183,32 +197,6 @@ class Index extends React.Component {
       </GenericPage>
     );
   }
-}
-
-const createDatasetListing = (list, groupName) => {
-  return list.map((d) => {
-    return {
-      filename: d.request.replace(`groups/${groupName}/`, '').replace('narratives/', ''),
-      url: `https://nextstrain.org/${d.request}`,
-      contributor: groupName
-    };
-  });
-};
-
-async function fetchAndParseJSON(jsonUrl, groupName) {
-  const datasetsJSON = await fetch(jsonUrl)
-    .then((res) => res.text())
-    .then((text) => {
-      const data = JSON.parse(text);
-      return {
-        datasets: createDatasetListing(data.datasets, groupName),
-        narratives: createDatasetListing(data.narratives, groupName)
-      };
-    })
-    .catch((err) => {
-      console.err(err);
-    });
-  return datasetsJSON;
 }
 
 export default Index;
