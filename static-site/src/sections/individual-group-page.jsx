@@ -108,21 +108,23 @@ class Index extends React.Component {
       })
       .catch((err) => {
         console.error("Cannot find group.", err.message);
-        this.setState({groupNotFound: true});
+        this.setState({groupName, groupNotFound: true});
       })
       .then((sourceInfo) => {
-        if (sourceInfo.showDatasets || sourceInfo.showNarratives) {
+        if (sourceInfo && (sourceInfo.showDatasets || sourceInfo.showNarratives)) {
           return fetchAndParseJSON(`/charon/getAvailable?prefix=/groups/${groupName}/`);
         }
         return undefined;
       })
       .then((availableDataJson) => {
-        this.setState({
-          datasets: this.createDatasetListing(availableDataJson.datasets, groupName),
-          narratives: this.createDatasetListing(availableDataJson.narratives, groupName),
-          dataLoaded: true,
-          groupName
-        });
+        if (availableDataJson) {
+          this.setState({
+            datasets: this.createDatasetListing(availableDataJson.datasets, groupName),
+            narratives: this.createDatasetListing(availableDataJson.narratives, groupName),
+            dataLoaded: true,
+            groupName
+          });
+        }
       })
       .catch((err) => {
         console.error("Error fetching / parsing data.", err.message);
@@ -194,6 +196,13 @@ class Index extends React.Component {
                   Please <a href="mailto:hello@nextstrain.org">contact us at hello@nextstrain.org </a>
                   if this continues to happen.</splashStyles.CenteredFocusParagraph>
           </FlexCenter>}
+        { this.state.groupNotFound &&
+        <FlexCenter>
+          <splashStyles.CenteredFocusParagraph>
+            {`The Nextstrain Group "${this.state.groupName}" doesn't exist yet. `}
+            Please <a href="mailto:hello@nextstrain.org">contact us at hello@nextstrain.org </a>
+            if you believe this to be an error.</splashStyles.CenteredFocusParagraph>
+        </FlexCenter>}
       </GenericPage>
     );
   }
