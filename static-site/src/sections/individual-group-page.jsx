@@ -63,6 +63,15 @@ function Website({children}) {
   );
 }
 
+const GroupNotFound = (groupName) => (
+  <FlexCenter>
+    <splashStyles.CenteredFocusParagraph>
+      {`The Nextstrain Group "${groupName}" doesn't exist yet. `}
+      Please <a href="mailto:hello@nextstrain.org">contact us at hello@nextstrain.org </a>
+      if you believe this to be an error.</splashStyles.CenteredFocusParagraph>
+  </FlexCenter>
+);
+
 const OverviewContainer = styled.div`
   text-align: justify;
   font-size: 16px;
@@ -101,38 +110,42 @@ class Index extends React.Component {
 
   async componentDidMount() {
     const groupName = this.props["groupName"];
-    fetchAndParseJSON(`/charon/getSourceInfo?prefix=/groups/${groupName}/`)
-      .then((sourceInfo) => {
-        this.setState({sourceInfo});
-        return sourceInfo;
-      })
-      .catch((err) => {
+    let sourceInfoPromise, availableDataPromise;
+    try {
+      [sourceInfoPromise, availableDataPromise] = await Promise.allSettled([
+        fetchAndParseJSON(`/charon/getSourceInfo?prefix=/groups/${groupName}/`),
+        fetchAndParseJSON(`/charon/getAvailable?prefix=/groups/${groupName}/`)
+      ]);
+      this.setState({
+        sourceInfo: sourceInfoPromise.value,
+        groupName,
+        datasets: this.createDatasetListing(availableDataPromise.value.datasets, groupName),
+        narratives: this.createDatasetListing(availableDataPromise.value.narratives, groupName),
+        dataLoaded: true
+      });
+    } catch (err) {
+      if (sourceInfoPromise.status === "rejected") {
         console.error("Cannot find group.", err.message);
         this.setState({groupName, groupNotFound: true});
-      })
-      .then((sourceInfo) => {
-        if (sourceInfo && (sourceInfo.showDatasets || sourceInfo.showNarratives)) {
-          return fetchAndParseJSON(`/charon/getAvailable?prefix=/groups/${groupName}/`);
-        }
-        return undefined;
-      })
-      .then((availableDataJson) => {
-        if (availableDataJson) {
-          this.setState({
-            datasets: this.createDatasetListing(availableDataJson.datasets, groupName),
-            narratives: this.createDatasetListing(availableDataJson.narratives, groupName),
-            dataLoaded: true,
-            groupName
-          });
-        }
-      })
-      .catch((err) => {
+      } else {
         console.error("Error fetching / parsing data.", err.message);
-        this.setState({errorFetchingData: true});
-      });
+        this.setState({
+          groupName,
+          sourceInfo: sourceInfoPromise.value,
+          errorFetchingData: true
+        });
+      }
+    }
   }
 
   render() {
+    if (this.state.groupNotFound) {
+      return (
+        <GenericPage location={this.props.location}>
+          <GroupNotFound groupName={this.state.groupName}/>
+        </GenericPage>
+      );
+    }
     return (
       <GenericPage location={this.props.location}>
         {this.state.sourceInfo &&
@@ -153,39 +166,45 @@ class Index extends React.Component {
           }
         </>}
         <HugeSpacer />
-        {this.state.dataLoaded && this.state.sourceInfo && this.state.sourceInfo.showDatasets && this.state.datasets.length > 0 && (
+        {this.state.dataLoaded && this.state.sourceInfo && this.state.sourceInfo.showDatasets && (
           <ScrollableAnchor id={"datasets"}>
             <div>
               <splashStyles.H3>Available datasets</splashStyles.H3>
-              <DatasetSelect
-                datasets={this.state.datasets}
-                columns={[
-                  {
-                    name: "Dataset",
-                    value: (dataset) => dataset.filename.replace(/_/g, ' / ').replace('.json', ''),
-                    url: (dataset) => dataset.url
-                  }
-                ]}
-              />
+              {this.state.datasets.length === 0 ?
+                <splashStyles.H4>No datasets are available for this group.</splashStyles.H4>
+                : <DatasetSelect
+                  datasets={this.state.datasets}
+                  columns={[
+                    {
+                      name: "Dataset",
+                      value: (dataset) => dataset.filename.replace(/_/g, ' / ').replace('.json', ''),
+                      url: (dataset) => dataset.url
+                    }
+                  ]}
+                />
+              }
             </div>
           </ScrollableAnchor>
         )}
         <HugeSpacer />
-        {this.state.dataLoaded && this.state.sourceInfo && this.state.sourceInfo.showNarratives && this.state.narratives.length > 0 &&(
+        {this.state.dataLoaded && this.state.sourceInfo && this.state.sourceInfo.showNarratives && (
           <ScrollableAnchor id={"narratives"}>
             <div>
               <splashStyles.H3>Available narratives</splashStyles.H3>
-              <DatasetSelect
-                datasets={this.state.narratives}
-                columns={[
-                  {
-                    name: "Narrative",
-                    value: (dataset) => dataset.filename.replace(/_/g, ' / ').replace('.json', ''),
-                    url: (dataset) => dataset.url
-                  }
-                ]}
-                unit="narrative"
-              />
+              {this.state.narratives.length === 0 ?
+                <splashStyles.H4>No narratives are available for this group.</splashStyles.H4>
+                : <DatasetSelect
+                  datasets={this.state.narratives}
+                  columns={[
+                    {
+                      name: "Narrative",
+                      value: (dataset) => dataset.filename.replace(/_/g, ' / ').replace('.json', ''),
+                      url: (dataset) => dataset.url
+                    }
+                  ]}
+                  title="Filter Narratives"
+                />
+              }
             </div>
           </ScrollableAnchor>
         )}
@@ -196,13 +215,6 @@ class Index extends React.Component {
                   Please <a href="mailto:hello@nextstrain.org">contact us at hello@nextstrain.org </a>
                   if this continues to happen.</splashStyles.CenteredFocusParagraph>
           </FlexCenter>}
-        { this.state.groupNotFound &&
-        <FlexCenter>
-          <splashStyles.CenteredFocusParagraph>
-            {`The Nextstrain Group "${this.state.groupName}" doesn't exist yet. `}
-            Please <a href="mailto:hello@nextstrain.org">contact us at hello@nextstrain.org </a>
-            if you believe this to be an error.</splashStyles.CenteredFocusParagraph>
-        </FlexCenter>}
       </GenericPage>
     );
   }
