@@ -1,7 +1,2 @@
 
-export async function fetchAndParseJSON(jsonUrl) {
-  const jsonData = await fetch(jsonUrl)
-    .then((res) => res.text())
-    .then((text) => JSON.parse(text));
-  return jsonData;
-}
+export const fetchAndParseJSON = async jsonUrl => fetch(jsonUrl).then((res) => res.json());
